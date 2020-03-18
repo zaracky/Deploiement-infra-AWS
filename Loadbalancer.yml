@@ -1,0 +1,97 @@
+AWSTemplateFormatVersion: 2010-09-09
+Description: >-
+  AWS CloudFormation infrastructure Template
+Parameters:
+  VpcIdentifier:
+    Type: AWS::EC2::VPC::Id  
+    Description: Select a vpc to launch EC2 Instance 
+    
+  PublicSubnets:
+    Type: AWS::EC2::Subnet::Id  
+    Description: Select a subnet to launch EC2 Instance 
+    
+  PublicSubnets2:
+    Type: AWS::EC2::Subnet::Id  
+    Description: Select a subnet to launch EC2 Instance   
+  WebsiteEC2SecurityGroup:  
+      Type:  AWS::EC2::SecurityGroup::Id 
+      Description: Select a security-group to launch  Instance
+      
+  WebsiteLoadBalancerSecurityGroup:  
+      Type:  AWS::EC2::SecurityGroup::Id 
+      Description: Select a security-group to launch loadbalancer
+    
+  KeyName:
+    Description: Name of an existing EC2 KeyPair to enable SSH access to the instance
+    Type: 'AWS::EC2::KeyPair::KeyName'
+    ConstraintDescription: must be the name of an existing EC2 KeyPair.  
+    
+Resources:
+      
+  WebsiteLaunchConfig:
+    Type: AWS::AutoScaling::LaunchConfiguration
+    Properties:
+      AssociatePublicIpAddress: true
+      IamInstanceProfile: "Ma_strategie"
+      ImageId: ami-096b8af6e7e8fb927
+      InstanceType: t2.micro
+      KeyName: !Ref KeyName
+      SecurityGroups:
+        - !Ref WebsiteEC2SecurityGroup
+      UserData:
+        Fn::Base64: !Sub |
+          #!/bin/bash
+             cd opt
+             wget https://raw.githubusercontent.com/zaracky/OCR_P10/master/configuration-docker.bash
+             sudo chmod +x configuration-docker.bash 
+             sudo bash configuration-docker.bash 
+          
+          
+  WebsiteScalingGroup:
+    Type: AWS::AutoScaling::AutoScalingGroup
+    Properties:
+      LaunchConfigurationName: !Ref WebsiteLaunchConfig
+      AvailabilityZones:
+        - Fn::Select:
+          - 0
+          - Fn::GetAZs: !Ref AWS::Region
+        - Fn::Select:
+          - 1
+          - Fn::GetAZs: !Ref AWS::Region
+      VPCZoneIdentifier: 
+         - !Ref PublicSubnets 
+         - !Ref PublicSubnets2
+      DesiredCapacity: 2
+      MaxSize: 4
+      MinSize: 2
+      TargetGroupARNs:
+        - !Ref WebsiteTargetGroup
+        
+        
+  WebsiteTargetGroup:
+    Type: AWS::ElasticLoadBalancingV2::TargetGroup
+    Properties:
+      Port: 80
+      Protocol: HTTP
+      VpcId: !Ref VpcIdentifier
+      
+      
+  WebsiteLoadBalancer:
+    Type: AWS::ElasticLoadBalancingV2::LoadBalancer
+    Properties:
+      Type: application
+      Scheme: internet-facing
+      SecurityGroups:
+        - !Ref WebsiteLoadBalancerSecurityGroup
+      Subnets: 
+         - !Ref PublicSubnets 
+         - !Ref PublicSubnets2
+  WebsiteLoadBlancerListener:
+    Type: AWS::ElasticLoadBalancingV2::Listener
+    Properties: 
+      LoadBalancerArn: !Ref WebsiteLoadBalancer
+      Port: 80
+      Protocol: HTTP
+      DefaultActions:
+        - Type: forward
+          TargetGroupArn: !Ref WebsiteTargetGroup
