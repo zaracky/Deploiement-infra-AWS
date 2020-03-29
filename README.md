@@ -1,6 +1,8 @@
 # OCR_AWS
 template aws
 
+Pré requis: création AMI et secret
+
 1- Template création VPC + Security groups :
     1 vpc + 3 sous réseaux et table de routage
     Security groupe pour ec2 rds et loadbalancer
