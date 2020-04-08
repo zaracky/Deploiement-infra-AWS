@@ -1,7 +1,7 @@
 # OCR_AWS
 TEMPLATE AWS
 
-/!\ LES TEMPLATES SONT IDEPENDANTS LES UN DES AUTRES
+/!\ LES TEMPLATES SONT INDEPENDANTS LES UNS DES AUTRES
 
 
 CONTENU:
@@ -17,7 +17,7 @@ CONTENU:
 
 PREREQUIS:
  
-/!\ Afin de ne pas divulguer  les données confidentiels, ces seront importés à partir de secretManager. Il est donc important de les créer au préalable.
+/!\ Afin de ne pas divulguer  les données confidentielles, ces seront importés à partir de secretManager. Il est donc important de les créer au préalable.
 Idéalement, il faudra les nommées DB_WORDPRESS et VPN
 
 Dans le cas contraire,il faudra le modifier dans les scripts de configuration et non les templates AWS
@@ -26,7 +26,7 @@ Script configuration:
 Docker: https://raw.githubusercontent.com/zaracky/OCR_P10/master/configuration-docker.bash
 Vpn: https://raw.githubusercontent.com/zaracky/OCR_P10/master/configurationvpn.bash
 
-A noter également qu'en cas de personalisation, il vous faudra heberger ces fichiers et indiquer le bon url pour que template le recupere.
+A noter également qu'en cas de personnalisation, il vous faudra heberger ces fichiers et indiquer le bon url pour que template le recupere.
 
 
 
@@ -37,7 +37,7 @@ UTILISATION:
 
 Aucun parametre n'est à renseigner
 
-Le template vas vous créer un VPC nommé "mon VPC" contenant 2 sous reseau public (10.0.100.0/24 et 10.0.101.0/24) et 1 sous reseau privée (10.0.0.0/24)
+Le template va créer un VPC nommé "mon VPC" contenant 2 sous reseau public (10.0.100.0/24 et 10.0.101.0/24) et 1 sous reseau privée (10.0.0.0/24)
 
 Les routes se feront par defaut vers l'internet gateway.
 
@@ -58,7 +58,7 @@ Voici les paramètres à indiquer lors de l'execution du template:
 -Les subnets qui pourront y accèder (par defaut 2 minimum)
 -Le security group rattaché
 
-Le template vas créer un cluster de base de données AURORA-MYSQL. Il s'agit d'un noeud Maitre/Replica sur deux zone de disponibilités.
+Le template va créer un cluster de base de données AURORA-MYSQL. Il s'agit d'un noeud Maitre/Replica sur deux zone de disponibilités.
 L'avantage ici est d'avoir un mecanisme de disponibilité mais également d'avoir des bases de données manager par AWS.
 
 Par exemple, l'administration (MAJ,Maintenance..) et la sauvegarde (frequence personalisable) sont géres par Amazon
