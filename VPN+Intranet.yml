@@ -1,0 +1,131 @@
+AWSTemplateFormatVersion: 2010-09-09
+Description: >-
+  AWS CloudFormation infrastructure Template
+  Ce template permet de créer : 1 instance intranet - 1 instance vpn
+
+  
+Parameters:
+#On declare ici le VPC et sous reseau ou seront deployer les instances
+  VpcIdentifier:
+    Type: AWS::EC2::VPC::Id  
+    Description: Selectionner le VPC ou seront executer les instances EC2 
+    
+  PublicSubnets:
+    Type: AWS::EC2::Subnet::Id  
+    Description: Selectionner la premiere zone de disponibilité des instances wordpress 
+      
+  KeyName:
+    Description: Nom de KeyPair EC2
+    Type: 'AWS::EC2::KeyPair::KeyName'
+    ConstraintDescription: must be the name of an existing EC2 KeyPair. 
+    
+
+    
+Resources:
+
+ #Creation de l'instance intranet et de son security group
+ 
+    IntranetInstance:
+      Type: 'AWS::EC2::Instance'
+      Properties:
+        AssociatePublicIpAddress: true
+        InstanceType: t2.micro
+        IamInstanceProfile: "Ma_strategie"
+        SubnetId: !Ref PrivateSubnets
+        SecurityGroups:
+          - !Ref IntranetSecurityGroup
+        KeyName: !Ref KeyName
+        Tags:
+          - Key: Name
+            Value: Intranet
+        ImageId: ami-096b8af6e7e8fb927
+        UserData: !Base64 
+          'Fn::Join':
+            - ''
+            - - |
+                #!/bin/bash -xe
+              - |
+                sudo apt-get update
+                sudo apt-get install  -y apache2
+                cd /var/www/html/
+                sudo rm index.html
+                wget https://esparonloic.s3.eu-west-3.amazonaws.com/index.html
+                wget https://esparonloic.s3.eu-west-3.amazonaws.com/style.css
+                wget https://esparonloic.s3.eu-west-3.amazonaws.com/pdf.png         
+        
+    IntranetSecurityGroup: 
+      Type:  AWS::EC2::SecurityGroup
+      Properties:
+        GroupDescription:  Website EC2 security group 
+        VpcId: 
+           Ref: VpcIdentifier
+        SecurityGroupEgress: 
+          - IpProtocol:  -1
+            CidrIp:  10.0.0.0/24
+        SecurityGroupIngress:
+          - IpProtocol: tcp
+            FromPort: 80
+            ToPort: 80
+          - IpProtocol: tcp
+            FromPort: 22
+            ToPort: 22
+            CidrIp: 0.0.0.0/0
+            
+#Création de l'instance VPN          
+            
+    VPNInstance:
+      Type: 'AWS::EC2::Instance'
+      Properties:
+        AssociatePublicIpAddress: true
+        InstanceType: t2.micro
+        IamInstanceProfile: "Ma_strategie"
+        SubnetId: !Ref PrivateSubnets
+        SecurityGroups:
+          - !Ref VPNSecurityGroup
+        KeyName: !Ref KeyName
+        Tags:
+          - Key: Name
+            Value: ServeurVPN
+        ImageId: ami-096b8af6e7e8fb927
+        UserData: !Base64 
+          'Fn::Join':
+            - ''
+            - - |
+                #!/bin/bash -xe
+              - |
+                wget https://raw.githubusercontent.com/zaracky/OCR_P10/master/configurationvpn.bash
+                sudo chmod +x configurationvpn.bash 
+                sudo bash configurationvpn.bash 
+ 
+    VPNSecurityGroup: 
+      Type:  AWS::EC2::SecurityGroup
+      Properties:
+        GroupDescription:  Website EC2 security group 
+        VpcId: 
+           Ref: VpcIdentifier 
+        SecurityGroupEgress: 
+          - IpProtocol:  -1
+            CidrIp:  0.0.0.0/0
+        SecurityGroupIngress:
+          - IpProtocol: tcp
+            FromPort: 500
+            ToPort: 500
+          - IpProtocol: tcp
+            FromPort: 22
+            ToPort: 22
+            CidrIp: 0.0.0.0/0
+ #On rattache a l'instance VPN une IP elastic                       
+    IPAddress:
+        Type: 'AWS::EC2::EIP'
+    IPAssoc:
+        Type: 'AWS::EC2::EIPAssociation'
+        Properties:
+            InstanceId: !Ref VPNInstance
+            EIP: !Ref IPAddress
+            
+Outputs:
+  InstanceIPAddress:
+    Description: IP address of the newly created EC2 instance
+    Value: !Ref IPAddress
+            
+            
