@@ -1,97 +1,228 @@
 AWSTemplateFormatVersion: 2010-09-09
 Description: >-
   AWS CloudFormation infrastructure Template
+  Ce template permet de créer : 1 load balancer - 1 group de auto scaling avec un minimum de 2 instances - 1 bucket s3 - 1 elasticache 
+  Les instances de l'auto scaling sont parametrés pour lancer docker wordpress au demarrage
+  La politique de auto scaling permet d'ajuster le nombre d'instance en fonction de la charge du CPU
+  Une notification par mail aura également lieu 
+  
 Parameters:
+#On declare ici le VPC et sous reseau ou seront deployer les instances
   VpcIdentifier:
     Type: AWS::EC2::VPC::Id  
-    Description: Select a vpc to launch EC2 Instance 
+    Description: Selectionner le VPC ou seront executer les instances EC2 
     
   PublicSubnets:
     Type: AWS::EC2::Subnet::Id  
-    Description: Select a subnet to launch EC2 Instance 
+    Description: Selectionner la premiere zone de disponibilité des instances wordpress
     
   PublicSubnets2:
     Type: AWS::EC2::Subnet::Id  
-    Description: Select a subnet to launch EC2 Instance   
+    Description: Selectionner la seconde zone de disponibilité des instances wordpress 
+      
+    
   WebsiteEC2SecurityGroup:  
       Type:  AWS::EC2::SecurityGroup::Id 
-      Description: Select a security-group to launch  Instance
+      Description: Selectionner le security-group associer aux  instances EC2 
       
   WebsiteLoadBalancerSecurityGroup:  
       Type:  AWS::EC2::SecurityGroup::Id 
-      Description: Select a security-group to launch loadbalancer
-    
+      Description: Selectionner le security-group associer au loadbalancer  
+      
   KeyName:
-    Description: Name of an existing EC2 KeyPair to enable SSH access to the instance
+    Description: Nom de KeyPair EC2
     Type: 'AWS::EC2::KeyPair::KeyName'
-    ConstraintDescription: must be the name of an existing EC2 KeyPair.  
+    ConstraintDescription: must be the name of an existing EC2 KeyPair. 
+    
+ #On indique ici l'adresse mail ou l'on souhaite etre notifier   
+  OperatorEMail:
+    Description: Entrer l'adresse mail ou vous souhaitez etre notifier
+    Type: String
+
     
 Resources:
-      
-  WebsiteLaunchConfig:
-    Type: AWS::AutoScaling::LaunchConfiguration
-    Properties:
-      AssociatePublicIpAddress: true
-      IamInstanceProfile: "Ma_strategie"
-      ImageId: ami-096b8af6e7e8fb927
-      InstanceType: t2.micro
-      KeyName: !Ref KeyName
-      SecurityGroups:
-        - !Ref WebsiteEC2SecurityGroup
-      UserData:
-        Fn::Base64: !Sub |
-          #!/bin/bash
-             cd opt
-             wget https://raw.githubusercontent.com/zaracky/OCR_P10/master/configuration-docker.bash
-             sudo chmod +x configuration-docker.bash 
-             sudo bash configuration-docker.bash 
+#Création du topic pour l'alerting
+    StackAlarmTopic:
+        Type: 'AWS::SNS::Topic'
+        Properties:
+          Subscription:
+            - Endpoint: !Ref OperatorEMail
+              Protocol: email 
+
+ #Création de la LaunchConfiguration           
+    WebsiteLaunchConfig:
+      Type: AWS::AutoScaling::LaunchConfiguration
+      Properties:
+        AssociatePublicIpAddress: true
+        IamInstanceProfile: "Ma_strategie"
+        ImageId: ami-096b8af6e7e8fb927
+        InstanceType: t2.micro
+        KeyName: !Ref KeyName
+        SecurityGroups:
+          - !Ref WebsiteEC2SecurityGroup
+        UserData:
+          Fn::Base64: !Sub |
+            #!/bin/bash
+               cd opt
+               wget https://raw.githubusercontent.com/zaracky/OCR_P10/master/configuration-docker.bash
+               sudo chmod +x configuration-docker.bash 
+               sudo bash configuration-docker.bash 
           
-          
-  WebsiteScalingGroup:
-    Type: AWS::AutoScaling::AutoScalingGroup
-    Properties:
-      LaunchConfigurationName: !Ref WebsiteLaunchConfig
-      AvailabilityZones:
-        - Fn::Select:
-          - 0
-          - Fn::GetAZs: !Ref AWS::Region
-        - Fn::Select:
-          - 1
-          - Fn::GetAZs: !Ref AWS::Region
-      VPCZoneIdentifier: 
-         - !Ref PublicSubnets 
-         - !Ref PublicSubnets2
-      DesiredCapacity: 2
-      MaxSize: 4
-      MinSize: 2
-      TargetGroupARNs:
-        - !Ref WebsiteTargetGroup
+ #Création du group de autoscaling         
+    WebServerGroup:
+      Type: AWS::AutoScaling::AutoScalingGroup
+      Properties:
+        LaunchConfigurationName: !Ref WebsiteLaunchConfig
+        AvailabilityZones:
+          - Fn::Select:
+            - 0
+            - Fn::GetAZs: !Ref AWS::Region
+          - Fn::Select:
+            - 1
+            - Fn::GetAZs: !Ref AWS::Region
+        VPCZoneIdentifier: 
+           - !Ref PublicSubnets 
+           - !Ref PublicSubnets2
+        DesiredCapacity: 2
+        MaxSize: 4
+        MinSize: 2
+        NotificationConfiguration:
+          TopicARN: !Ref StackAlarmTopic
+          NotificationTypes:
+            - 'autoscaling:EC2_INSTANCE_LAUNCH'
+            - 'autoscaling:EC2_INSTANCE_LAUNCH_ERROR'
+            - 'autoscaling:EC2_INSTANCE_TERMINATE'
+            - 'autoscaling:EC2_INSTANCE_TERMINATE_ERROR'
+        TargetGroupARNs:
+          - !Ref WebsiteTargetGroup
+ 
+#Création de la politique de autoscaling permettant d'ajuster les instances en fonction de la charge du CPU 
+    WebServerScaleUpPolicy:
+      Type: 'AWS::AutoScaling::ScalingPolicy'
+      Properties:
+        AdjustmentType: ChangeInCapacity
+        AutoScalingGroupName: !Ref WebServerGroup
+        Cooldown: '60'
+        ScalingAdjustment: '1'
+    WebServerScaleDownPolicy:
+      Type: 'AWS::AutoScaling::ScalingPolicy'
+      Properties:
+        AdjustmentType: ChangeInCapacity
+        AutoScalingGroupName: !Ref WebServerGroup
+        Cooldown: '60'
+        ScalingAdjustment: '-1'     
         
         
-  WebsiteTargetGroup:
-    Type: AWS::ElasticLoadBalancingV2::TargetGroup
-    Properties:
-      Port: 80
-      Protocol: HTTP
-      VpcId: !Ref VpcIdentifier
+#Création des alarmes en cas de hausse et de baisse du CPU
+    CPUAlarmHigh:
+      Type: 'AWS::CloudWatch::Alarm'
+      Properties:
+        AlarmDescription: Scale-up if CPU > 80% for 10 minutes
+        MetricName: CPUUtilization
+        Namespace: AWS/EC2
+        Statistic: Average
+        Period: '300'
+        EvaluationPeriods: '2'
+        Threshold: '80'
+        AlarmActions:
+          - !Ref WebServerScaleUpPolicy
+        Dimensions:
+          - Name: AutoScalingGroupName
+            Value: !Ref WebServerGroup
+        ComparisonOperator: GreaterThanThreshold
+    CPUAlarmLow:
+      Type: 'AWS::CloudWatch::Alarm'
+      Properties:
+        AlarmDescription: Scale-down if CPU < 70% for 10 minutes
+        MetricName: CPUUtilization
+        Namespace: AWS/EC2
+        Statistic: Average
+        Period: '300'
+        EvaluationPeriods: '2'
+        Threshold: '70'
+        AlarmActions:
+          - !Ref WebServerScaleDownPolicy
+        Dimensions:
+          - Name: AutoScalingGroupName
+            Value: !Ref WebServerGroup
+        ComparisonOperator: LessThanThreshold 
+
+
+#Création du load balancer      
+    WebsiteTargetGroup:
+      Type: AWS::ElasticLoadBalancingV2::TargetGroup
+      Properties:
+        Port: 80
+        Protocol: HTTP
+        VpcId: !Ref VpcIdentifier  
       
-      
-  WebsiteLoadBalancer:
-    Type: AWS::ElasticLoadBalancingV2::LoadBalancer
-    Properties:
-      Type: application
-      Scheme: internet-facing
-      SecurityGroups:
-        - !Ref WebsiteLoadBalancerSecurityGroup
-      Subnets: 
-         - !Ref PublicSubnets 
-         - !Ref PublicSubnets2
-  WebsiteLoadBlancerListener:
-    Type: AWS::ElasticLoadBalancingV2::Listener
-    Properties: 
-      LoadBalancerArn: !Ref WebsiteLoadBalancer
-      Port: 80
-      Protocol: HTTP
-      DefaultActions:
-        - Type: forward
-          TargetGroupArn: !Ref WebsiteTargetGroup
+    WebsiteLoadBalancer:
+      Type: AWS::ElasticLoadBalancingV2::LoadBalancer
+      Properties:
+        Type: application
+        Scheme: internet-facing
+        SecurityGroups:
+          - !Ref WebsiteLoadBalancerSecurityGroup
+        Subnets: 
+           - !Ref PublicSubnets 
+           - !Ref PublicSubnets2
+    WebsiteLoadBlancerListener:
+      Type: AWS::ElasticLoadBalancingV2::Listener
+      Properties: 
+        LoadBalancerArn: !Ref WebsiteLoadBalancer
+        Port: 80
+        Protocol: HTTP
+        DefaultActions:
+          - Type: forward
+            TargetGroupArn: !Ref WebsiteTargetGroup
+            
+
+            
+#Création de la mise en cache
+
+    CacheCluster:
+      Type: 'AWS::ElastiCache::CacheCluster'
+      Properties:
+        CacheNodeType: cache.r3.large
+        CacheSecurityGroupNames:
+          - !Ref CacheSecurityGroup
+        Engine: memcached
+        NumCacheNodes: 1
+    CacheSecurityGroup:
+      Type: 'AWS::ElastiCache::SecurityGroup'
+      Properties:
+        Description: Lock cache down to Web Server access only
+    CacheSecurityGroupIngress:
+      Type: 'AWS::ElastiCache::SecurityGroupIngress'
+      Properties:
+        CacheSecurityGroupName: !Ref CacheSecurityGroup
+        EC2SecurityGroupName: !Ref WebsiteEC2SecurityGroup
+
+#Création du bucket dedier au stockage du media
+    S3Bucket:
+      Type: 'AWS::S3::Bucket'
+      Properties:
+        AccessControl: PublicRead
+        WebsiteConfiguration:
+          IndexDocument: index.html
+          ErrorDocument: error.html
+      DeletionPolicy: Retain
+Outputs:
+    WebsiteURL:
+      Value: !GetAtt 
+        - S3Bucket
+        - WebsiteURL
+      Description: URL for website hosted on S3
+    S3BucketSecureURL:
+      Value: !Join 
+        - ''
+        - - 'https://'
+          - !GetAtt 
+            - S3Bucket
+            - DomainName
+      Description: Name of S3 bucket to hold website content
+
+
+
+            
+            
