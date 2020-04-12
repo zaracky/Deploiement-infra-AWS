@@ -12,13 +12,15 @@ CONTENU:
 
 2- Template création DB aurora mysql en multi az
 
-3- Création de 2 instances wordpress + 1 autoscaling group + 1 load balancer + 1 instance intranet (page html fixe) + 1 instance serveur vpn (strongswan)
+3- Template création de 2 instances wordpress + 1 autoscaling group + 1 load balancer + 1 bucket S3
+
+4- Template création 1 instance intranet (page html fixe) + 1 instance serveur vpn (strongswan)
 
 
 PREREQUIS:
  
 /!\ Afin de ne pas divulguer  les données confidentielles, ces seront importés à partir de secretManager. Il est donc important de les créer au préalable.
-Idéalement, il faudra les nommées DB_WORDPRESS et VPN
+Il faudrait idéalement les nommées DB_WORDPRESS et VPN
 
 Dans le cas contraire,il faudra le modifier dans les scripts de configuration et non les templates AWS
 
@@ -28,7 +30,9 @@ Vpn: https://raw.githubusercontent.com/zaracky/OCR_P10/master/configurationvpn.b
 
 A noter également qu'en cas de personnalisation, il vous faudra heberger ces fichiers et indiquer le bon url pour que template le recupere.
 
+-L'alerting par mail reste à configurer manuellement (hors autoscaling)
 
+-Il est conseillé de réaliser une sauvegarde AMI des instances VPN et Intranet
 
 
 UTILISATION:
@@ -68,9 +72,21 @@ Par exemple, l'administration (MAJ,Maintenance..) et la sauvegarde (frequence pe
 Voici les paramètres à indiquer lors de l'execution du template:
 -Le VPC ou ils seront crées
 - Les subnets publique dédié au instance Wordpress
-- Le subnet privé dédié idéalement au instance VPN et Intranet
 - La clé de connexion au instances
 - Le security group rattaché aux instances
 -Le security group rattaché au loadbalancer
 
+Les instances seront basées sur une image Ubuntu18.06 et un t2.small.
+L'image docker contient le plugin S3 permettant d'heberger les medias sur un bucket S3
+
+4- Intranet et VPN
+
+Voici les paramètres à indiquer lors de l'execution du template:
+-Le VPC ou ils seront crées
+- Le subnet ou seront crées les instances
+- La clé de connexion au instances
+
+Les instances seront basées sur une image Ubuntu18.06 et un t2.small.
+Le VPN est déployé via la solution strongswan qui utilise le protocole Ipsec
+L'intranet est une page fixe modifiable en local si besoin
 
