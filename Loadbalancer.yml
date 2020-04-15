@@ -177,27 +177,6 @@ Resources:
             TargetGroupArn: !Ref WebsiteTargetGroup
             
 
-            
-#Création de la mise en cache
-
-    CacheCluster:
-      Type: 'AWS::ElastiCache::CacheCluster'
-      Properties:
-        CacheNodeType: cache.r3.large
-        CacheSecurityGroupNames:
-          - !Ref CacheSecurityGroup
-        Engine: memcached
-        NumCacheNodes: 1
-    CacheSecurityGroup:
-      Type: 'AWS::ElastiCache::SecurityGroup'
-      Properties:
-        Description: Lock cache down to Web Server access only
-    CacheSecurityGroupIngress:
-      Type: 'AWS::ElastiCache::SecurityGroupIngress'
-      Properties:
-        CacheSecurityGroupName: !Ref CacheSecurityGroup
-        EC2SecurityGroupName: !Ref WebsiteEC2SecurityGroup
-
 #Création du bucket dedier au stockage du media
     S3Bucket:
       Type: 'AWS::S3::Bucket'
