@@ -10,7 +10,7 @@ Parameters:
     Type: AWS::EC2::VPC::Id  
     Description: Selectionner le VPC ou seront executer les instances EC2 
     
-  PublicSubnets:
+  PrivateSubnets:
     Type: AWS::EC2::Subnet::Id  
     Description: Selectionner la premiere zone de disponibilité des instances wordpress 
       
@@ -28,11 +28,10 @@ Resources:
     IntranetInstance:
       Type: 'AWS::EC2::Instance'
       Properties:
-        AssociatePublicIpAddress: true
         InstanceType: t2.micro
         IamInstanceProfile: "Ma_strategie"
         SubnetId: !Ref PrivateSubnets
-        SecurityGroups:
+        SecurityGroupIds:
           - !Ref IntranetSecurityGroup
         KeyName: !Ref KeyName
         Tags:
@@ -76,11 +75,10 @@ Resources:
     VPNInstance:
       Type: 'AWS::EC2::Instance'
       Properties:
-        AssociatePublicIpAddress: true
         InstanceType: t2.micro
         IamInstanceProfile: "Ma_strategie"
         SubnetId: !Ref PrivateSubnets
-        SecurityGroups:
+        SecurityGroupIds:
           - !Ref VPNSecurityGroup
         KeyName: !Ref KeyName
         Tags:
@@ -117,6 +115,9 @@ Resources:
  #On rattache a l'instance VPN une IP elastic                       
     IPAddress:
         Type: 'AWS::EC2::EIP'
+        Properties:
+          Domain: 
+              Ref: VpcIdentifier
     IPAssoc:
         Type: 'AWS::EC2::EIPAssociation'
         Properties:
