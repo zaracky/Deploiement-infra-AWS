@@ -15,6 +15,7 @@ Resources:
   PrivateSubnetC:
     Type: AWS::EC2::Subnet
     Properties:
+      MapPublicIpOnLaunch: 'true'
       AvailabilityZone: eu-west-3c
       CidrBlock: 10.0.0.0/24
       Tags:
