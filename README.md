@@ -4,7 +4,7 @@ TEMPLATE AWS
 /!\ LES TEMPLATES SONT INDEPENDANTS LES UNS DES AUTRES
 
 
-CONTENU:
+## CONTENU:
 
 1- Template création VPC + Security groups :
     1 vpc + 3 sous réseaux et table de routage
@@ -17,7 +17,7 @@ CONTENU:
 4- Template création 1 instance intranet (page html fixe) + 1 instance serveur vpn (strongswan)
 
 
-PREREQUIS:
+## PREREQUIS:
  
 /!\ Afin de ne pas divulguer  les données confidentielles, ces seront importés à partir de secretManager. Il est donc important de les créer au préalable.
 Il faudrait idéalement les nommées DB_WORDPRESS et VPN
@@ -35,7 +35,7 @@ A noter également qu'en cas de personnalisation, il vous faudra heberger ces fi
 -Il est conseillé de réaliser une sauvegarde AMI des instances VPN et Intranet
 
 
-UTILISATION:
+## UTILISATION:
 
 1- LE VPC
 
@@ -51,7 +51,7 @@ Les routes se feront par defaut vers l'internet gateway.
 1 Pour les bases de données autorisant la connexion au port 3306 uniquement par les instances EC2
 
 
-2- La base RDS
+## 2- La base RDS
 
 Voici les paramètres à indiquer lors de l'execution du template:
 -Le type d'instance
@@ -67,7 +67,7 @@ L'avantage ici est d'avoir un mecanisme de disponibilité mais également d'avoi
 
 Par exemple, l'administration (MAJ,Maintenance..) et la sauvegarde (frequence personalisable) sont géres par Amazon
 
-3- LoadBalancer et EC2
+## 3- LoadBalancer et EC2
 
 Voici les paramètres à indiquer lors de l'execution du template:
 -Le VPC ou ils seront crées
@@ -79,7 +79,7 @@ Voici les paramètres à indiquer lors de l'execution du template:
 Les instances seront basées sur une image Ubuntu18.06 et un t2.small.
 L'image docker contient le plugin S3 permettant d'heberger les medias sur un bucket S3
 
-4- Intranet et VPN
+## 4- Intranet et VPN
 
 Voici les paramètres à indiquer lors de l'execution du template:
 -Le VPC ou ils seront crées
